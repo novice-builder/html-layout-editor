@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
 <meta name="theme-color" content="#111827" />
 <title>Layout Studio — Visual HTML Mockups</title>
-<!-- Layout Studio v4: stable overlay panels, bounded pan, remote move, marquee, virtual cursor, variant library, precision controls -->
+<!-- Layout Studio v5: stable overlay panels, bounded pan, remote move, marquee, virtual cursor, variant library, precision controls -->
 <style>
 :root{--bg:#f3f5f9;--shell:#111827;--surface:#fff;--ink:#192235;--muted:#718096;--line:#e2e7ee;--blue:#4669f5;--blueSoft:#edf1ff;--panel:#fff;--safe:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -115,18 +115,30 @@ body.focus-mode #focusBtn{background:#eaf0ff;color:#3559ce}
 /* Keep the frequently used zoom controls reachable at small widths; secondary toggles are in Project. */
 @media(max-width:800px){.toolbar{justify-content:flex-start;overflow-x:auto;scrollbar-width:none}.toolbar::-webkit-scrollbar{display:none}.toolbar .toolcluster{flex:none}.toolbar .toolcluster:last-child{display:none}}
 
+/* v5: visible drawing spans the full device viewport; editor chrome floats over it. */
+.zoom-input{display:inline-block;width:56px;min-width:56px;text-align:center;padding:0 3px;appearance:none;-webkit-appearance:none;flex:none;user-select:text;-webkit-user-select:text;border-color:#d5dce9}
+.zoom-input:focus{background:#f5f7ff;border-color:#5575ff;outline:2px solid #c4d0ff;outline-offset:0}
+@media(max-width:800px){
+ #workspace>.stage-wrap{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important}
+ #app>.topbar,#app>.toolbar,#app>.mobile-tabs{position:relative;z-index:4}
+ #workspace{z-index:2}
+ #workspace .canvas-tools{top:calc(106px + env(safe-area-inset-top,0px))}
+ #workspace .stage-size{bottom:calc(69px + var(--safe))}
+ body.focus-mode #workspace .canvas-tools{top:calc(8px + env(safe-area-inset-top,0px))}
+ body.focus-mode #workspace .stage-size{bottom:calc(10px + var(--safe))}
+}
 </style>
 </head>
 <body>
 <div id="app">
 <header class="topbar">
-  <div class="brand"><div class="logo">▣</div><div class="titlebox"><div class="appname">LAYOUT STUDIO · V4</div><input id="projectTitle" class="project-title" value="Untitled design" aria-label="Project name" /></div></div>
+  <div class="brand"><div class="logo">▣</div><div class="titlebox"><div class="appname">LAYOUT STUDIO · V5</div><input id="projectTitle" class="project-title" value="Untitled design" aria-label="Project name" /></div></div>
   <div class="top-actions"><button id="undo" class="ibtn" aria-label="Undo" title="Undo">↶</button><button id="redo" class="ibtn" aria-label="Redo" title="Redo">↷</button><button id="saveTop" class="top-action-primary">Export</button></div>
 </header>
 <div class="toolbar">
 <div class="toolcluster">
 <select id="device" class="device-select" title="Canvas size"><option value="phone">iPhone</option><option value="largephone">Large phone</option><option value="tablet">Tablet</option><option value="desktop">Desktop</option><option value="custom">Custom</option></select>
-<button id="fit" class="softBtn" title="Set canvas dimensions to your device screen">Screen</button><button id="fitView" class="softBtn" title="Zoom to fit canvas inside the editor viewport">View</button><button id="zoomOut" class="softBtn icon" title="Zoom out">−</button><button id="zoomLabel" class="softBtn" style="min-width:52px">100%</button><button id="zoomIn" class="softBtn icon" title="Zoom in">+</button>
+<button id="fit" class="softBtn" title="Set canvas dimensions to your device screen">Screen</button><button id="fitView" class="softBtn" title="Zoom to fit canvas inside the editor viewport">View</button><button id="zoomOut" class="softBtn icon" title="Zoom out">−</button><input id="zoomLabel" class="softBtn zoom-input" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Zoom percentage. Tap to enter an exact value" title="Tap to enter exact zoom percentage" value="100%" /><button id="zoomIn" class="softBtn icon" title="Zoom in">+</button>
 </div><div class="toolcluster">
 <button id="snap" class="softBtn active desktop-only" title="Snap component outer edges to grid">Snap</button><button id="grid" class="softBtn icon" title="Show grid">▦</button><button id="multi" class="softBtn icon" title="Multi-select">▧</button><button id="preview" class="softBtn icon" title="Preview without selection outlines">◉</button>
 </div>
@@ -492,7 +504,7 @@ function renderProject(){const p=$('projectControls');p.innerHTML=`<div class="s
 <hr class="subdivider"><div class="btnrow"><button data-project="import" class="actionbtn">Open project JSON</button><button data-project="sample" class="actionbtn">Load sample layout</button><button data-project="new" class="actionbtn danger">New blank canvas</button></div>
 <div class="section-title">Overall design notes</div><div class="field"><label>Instructions for ChatGPT or a developer</label><textarea data-prop="projectNotes" rows="3" placeholder="e.g. Keep the header fixed at the top">${escapeHTML(project.notes)}</textarea></div>
 <div class="section-title">Grid & alignment</div><div class="btnrow"><button data-project="snap" class="actionbtn ${snap?'active':''}">Snap edges: ${snap?'ON':'OFF'}</button><button data-project="grid" class="actionbtn ${showGrid?'active':''}">Show grid: ${showGrid?'ON':'OFF'}</button></div><div class="field-row">${mkField('Grid spacing (px)','gridStep',project.gridStep||8,'number','min="2" max="128"')}${mkField('Grid X origin (px)','gridOffsetX',project.gridOffsetX||0,'number')}</div>${mkField('Grid Y origin (px)','gridOffsetY',project.gridOffsetY||0,'number')}<p class="smallNote">Components snap by their outer edges; the origin values move the grid lines inward or outward from the canvas edge. Each component also has optional X/Y insets in Edit.</p><div class="section-title">View controls</div><div class="btnrow"><button data-view="pan" class="actionbtn ${panMode?'active':''}">Pan: ${panMode?'ON':'OFF'}</button><button data-view="move" class="actionbtn">Move from anywhere</button><button data-view="marquee" class="actionbtn">Rectangle select</button><button data-view="cursor" class="actionbtn">Cursor</button><button data-view="preview" class="actionbtn">Preview</button><button data-view="handles" class="actionbtn ${handlesVisible?'active':''}">Handles: ${handlesVisible?'ON':'OFF'}</button><button data-view="focus" class="actionbtn">${focusMode?'Exit full screen':'Full-screen canvas'}</button></div>
-<p class="smallNote">Screen sets canvas dimensions to this device’s actual display (CSS pixels); View fits the drawing into the available editor area. Menus overlay the canvas and do not move it. The editor works offline. It tries to autosave in this browser, but exporting JSON is the reliable way to keep a backup, particularly on iPhone.</p>`;}
+<p class="smallNote">Screen uses the entire device screen at exactly 100% zoom (CSS pixels); View scales to show the canvas. Tap the zoom percentage to type a value, or use + and − in exact 10-point steps. Menus overlay the canvas and do not move it. The editor works offline. It tries to autosave in this browser, but exporting JSON is the reliable way to keep a backup, particularly on iPhone.</p>`;}
 function projectChange(prop,v){if(prop==='projectNotes'){project.notes=v;persist();return;}checkpoint();
  if(prop==='background'){if(!/^#[0-9a-f]{6}$/i.test(v))return;project.background=v;}
  else if(['gridStep','gridOffsetX','gridOffsetY'].includes(prop)){
@@ -744,6 +756,30 @@ window.addEventListener('resize',()=>{document.body.classList.toggle('panels-col
 // Initialise existing autosaved design.
 try{let saved=localStorage.getItem('layout-studio-autosave');if(saved)project=validateProject(JSON.parse(saved));}catch(err){/* start with blank project */}
 layoutInset=project.layoutInset??16;layoutGap=project.layoutGap??12;rebuildPalette();updateToolButtons();setTab(window.innerWidth<801?'add':'edit');if(window.innerWidth<=800)panelOpen=false;applyPanelUI();refresh();
+// V5: device-size canvas is 1:1 with actual screen CSS pixels, even behind the controls.
+const previousPositionStage=positionStage;
+positionStage=function(){previousPositionStage();if(document.activeElement!==$('zoomLabel'))$('zoomLabel').value=rnd(scale*100)+'%';};
+$('fit').onclick=()=>{
+ const [w,h]=screenSize(),changed=project.width!==w||project.height!==h;
+ if(changed){checkpoint();project.width=w;project.height=h;project.items.forEach(it=>{it.w=clamp(it.w,minDimension(it,'w'),w);it.h=clamp(it.h,minDimension(it,'h'),h);it.x=clamp(it.x,0,w-it.w);it.y=clamp(it.y,0,h-it.h);});}
+ autoFit=false;scale=1;refresh();
+ // The board starts at the device's top-left; remaining regions are reachable by panning.
+ panX=(project.width-W.clientWidth)/2;panY=(project.height-W.clientHeight)/2;positionStage();
+ if(changed)persist();toast('Device screen '+w+' × '+h+' · 100% zoom');
+};
+// Each press changes to the next 10-point boundary: 89 -> 90 -> 100, 107 -> 100.
+const zoomByStep=direction=>{const pct=Math.round(scale*10000)/100;const target=direction>0?(Math.floor((pct+.0001)/10)+1)*10:(Math.ceil((pct-.0001)/10)-1)*10;setScale(clamp(target,8,500)/100,false);};
+$('zoomIn').onclick=()=>zoomByStep(1);$('zoomOut').onclick=()=>zoomByStep(-1);
+const applyZoomInput=()=>{const input=$('zoomLabel'),raw=input.value.trim().replace('%','').replace(',','.').trim(),pct=Number(raw);
+ if(!raw||!Number.isFinite(pct)||pct<=0){input.value=rnd(scale*100)+'%';toast('Enter a zoom percentage such as 100 or 75');return;}
+ const value=clamp(pct,8,500);setScale(value/100,false);input.value=(Math.round(value*100)/100)+'%';if(value!==pct)toast('Zoom limit: 8%–500%');
+};
+$('zoomLabel').onclick=null;
+$('zoomLabel').addEventListener('focus',e=>e.target.select());
+$('zoomLabel').addEventListener('change',applyZoomInput);
+$('zoomLabel').addEventListener('blur',()=>{if(!$('zoomLabel').value.endsWith('%'))applyZoomInput();});
+$('zoomLabel').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur();}if(e.key==='Escape'){e.preventDefault();e.target.value=rnd(scale*100)+'%';e.target.blur();}});
+positionStage();
 })();
 </script>
 </body>
