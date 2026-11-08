@@ -81,7 +81,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
    <button type="button" class="action primary" id="quickPaste">▣ &nbsp; Quick Paste</button>
    <button type="button" class="action clear" id="quickClear">✕ &nbsp; Quick Delete</button>
   </div>
-  <div class="pasteAssist hidden" id="pasteAssist"><span>No native Paste option?</span><button type="button" id="manualPaste">Paste manually</button></div>
+  <div class="pasteAssist hidden" id="pasteAssist"><span>Clipboard needs another tap.</span><button type="button" id="retryPaste">Retry Paste</button><button type="button" id="manualPaste">Paste manually</button></div>
  </header>
  <div class="mainbar">
   <div class="switch">
@@ -249,48 +249,50 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
   var parts=parsePaste(text);
   if(!parts)return false;
   previousClear=null;setData(parts);
-  nativePastePending=false;
   el('pasteAssist').classList.add('hidden');
   el('pasteModal').classList.remove('open');
   setView('preview');toast('Pasted and preview updated',false);
   return true;
  }
- var nativePastePending=false;
+ var pasteBusy=false;
  function showPaste(){
-  nativePastePending=false;
   el('pasteAssist').classList.add('hidden');
   el('pasteInput').value='';
   el('pasteModal').classList.add('open');
  }
- function quickPaste(){
-  if(nativePastePending){
-   showPaste();
-   return;
-  }
-  el('pasteAssist').classList.add('hidden');
-  nativePastePending=true;
-  try{document.execCommand('paste');}catch(e){}
-  setTimeout(function(){
-   if(nativePastePending)el('pasteAssist').classList.remove('hidden');
-  },1200);
+ async function readClipboardOnce(){
+  if(!navigator.clipboard||!navigator.clipboard.readText)return false;
+  try{
+   var text=await navigator.clipboard.readText();
+   return !!(text&&text.trim()&&importText(text));
+  }catch(e){return false;}
  }
- document.addEventListener('paste',function(e){
-  if(!nativePastePending)return;
-  var text=e.clipboardData&&e.clipboardData.getData('text/plain');
-  if(text&&text.trim()){
-   e.preventDefault();
-   e.stopPropagation();
-   nativePastePending=false;
-   el('pasteAssist').classList.add('hidden');
-   importText(text);
+ async function quickPaste(){
+  if(pasteBusy)return;
+  pasteBusy=true;
+  var button=el('quickPaste');
+  var label=button.innerHTML;
+  button.disabled=true;
+  button.textContent='Reading clipboard…';
+  el('pasteAssist').classList.add('hidden');
+  try{
+   if(await readClipboardOnce())return;
+   // Safari sometimes rejects the first read even after the user taps Allow.
+   // Try once more automatically. A separate tap may still be required by iOS.
+   if(await readClipboardOnce())return;
+   el('pasteAssist').classList.remove('hidden');
+  }finally{
+   pasteBusy=false;
+   button.disabled=false;
+   button.innerHTML=label;
   }
- },true);
+ }
  function importManually(){
   var value=el('pasteInput').value;
   if(!importText(value))toast('Paste some code first',false);
  }
  function clearAll(){
-  nativePastePending=false;el('pasteAssist').classList.add('hidden');
+  el('pasteAssist').classList.add('hidden');
   previousClear=snapshot();setData({html:'',css:'',js:''});
   toast('Code deleted',true);
  }
@@ -302,6 +304,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
   setTimeout(function(){URL.revokeObjectURL(url);},3000);toast('HTML file exported',false);
  }
  el('quickPaste').addEventListener('click',quickPaste);
+ el('retryPaste').addEventListener('click',quickPaste);
  el('manualPaste').addEventListener('click',showPaste);
  el('quickClear').addEventListener('click',clearAll);
  el('undo').addEventListener('click',undoClear);
