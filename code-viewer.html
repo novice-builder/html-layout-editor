@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#172235">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Code Viewer | Layout Studio</title>
+<style>
+:root{color-scheme:light;--ink:#182438;--muted:#708096;--blue:#486bfa;--line:#dfe5ef;--bg:#eef2f8}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+button,textarea,select{font:inherit}button{cursor:pointer;touch-action:manipulation}
+button:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid #6685ff;outline-offset:2px}
+#app{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+header{padding:calc(env(safe-area-inset-top,0px) + 9px) 13px 12px;background:#172235;color:white;flex:none}
+.heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sub{font-size:11px;letter-spacing:.06em;color:#b4c2d8;text-transform:uppercase}
+h1{font-size:19px;line-height:1.15;margin:2px 0 0;font-weight:750}
+.home{color:#d8e3ff;text-decoration:none;border:1px solid #66758e;border-radius:9px;padding:8px 9px;white-space:nowrap;font-size:12px}
+.quick{display:flex;gap:8px;margin-top:13px}
+.action{min-height:43px;border:0;border-radius:10px;padding:10px 12px;font-weight:700;display:inline-flex;gap:7px;align-items:center;justify-content:center}
+.action.primary{background:#7390ff;color:#071735;flex:1}
+.action.clear{background:#39465b;color:#fff;flex:0 0 auto}
+.action.outline{background:#fff;color:#27364d;border:1px solid var(--line)}
+.action:active{filter:brightness(.94)}
+.mainbar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border-bottom:1px solid var(--line);flex:none}
+.switch{display:flex;gap:3px;background:#edf1f8;border-radius:10px;padding:3px;min-width:0;flex:1}
+.switch button{border:0;background:transparent;border-radius:7px;padding:9px 12px;color:#506178;font-weight:650;flex:1}
+.switch button.active{color:#15253b;background:white;box-shadow:0 1px 4px #20385822}
+#saveStatus{font-size:11px;color:#738298;min-width:60px;text-align:right}
+main{flex:1;min-height:0;display:flex;flex-direction:column}
+.panel{flex:1;min-height:0;display:flex;flex-direction:column}
+.hidden{display:none!important}
+.previewtools,.edittools{display:flex;align-items:center;gap:7px;padding:9px 12px;background:#fff;border-bottom:1px solid var(--line);flex:none}
+.previewtools label{font-size:12px;color:#52647b}
+select{min-width:0;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#26354a}
+.smallbutton{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;color:#26354a;font-weight:600}
+.push{margin-left:auto}
+.previewarea{flex:1;min-height:0;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:14px;background:linear-gradient(135deg,#e6ecf5,#f5f7fb)}
+.framewrap{height:100%;max-height:100%;width:100%;min-width:0;border:1px solid #d1d9e5;border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 7px 24px #17223512}
+iframe{display:block;width:100%;height:100%;border:0;background:#fff}
+#previewPanel.fullscreen{position:fixed;inset:0;z-index:50;background:#eef2f8}
+#previewPanel.fullscreen .previewarea{padding:0}
+#previewPanel.fullscreen .framewrap{border:0;border-radius:0;box-shadow:none}
+#previewInfo{flex:none;min-height:30px;padding:6px 12px;background:#fff;border-top:1px solid var(--line);color:#5b6a7e;font-size:11px}
+#previewInfo.problem{color:#b22f41}
+.edittools{justify-content:space-between}
+.codechoices{display:flex;gap:5px}
+.codechoices button{background:#eef2f8;border:0;border-radius:8px;color:#50647e;font-weight:700;padding:9px 13px}
+.codechoices button.active{background:#dce5ff;color:#3152c6}
+#editor{flex:1;width:100%;min-height:0;resize:none;border:0;outline:none;padding:15px 14px 30px;background:#111927;color:#edf3ff;line-height:1.53;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2;white-space:pre;overflow:auto;overflow-wrap:normal}
+#editor::placeholder{color:#98a5b8}
+.bottom{background:#fff;border-top:1px solid var(--line);padding:9px 12px calc(env(safe-area-inset-bottom,0px) + 9px);display:flex;gap:9px;align-items:center;justify-content:space-between;flex:none}
+.bottom button{border-radius:9px;border:1px solid #d9e1ed;background:#fff;padding:10px 12px;font-weight:650;color:#26384f}
+.bottom button.export{background:#284bea;border-color:#284bea;color:#fff}
+#toast{position:fixed;z-index:90;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 68px);transform:translateX(-50%);background:#1c2d44;color:#fff;box-shadow:0 8px 28px #0004;padding:10px 12px;border-radius:12px;max-width:calc(100% - 24px);min-width:230px;display:none;align-items:center;gap:14px;justify-content:space-between}
+#toast button{background:#7c9aff;border:0;border-radius:8px;padding:7px 9px;font-weight:700;color:#071735}
+#pasteModal{position:fixed;inset:0;background:#0a162da8;display:none;z-index:80;padding:14px;align-items:center;justify-content:center}
+#pasteModal.open{display:flex}
+.modalcard{width:100%;max-width:620px;background:#fff;border-radius:16px;padding:17px;box-shadow:0 24px 65px #0005}
+.modalcard h2{font-size:19px;margin:0 0 5px}
+.modalcard p{font-size:13px;color:#65748a;line-height:1.5;margin:0 0 12px}
+#pasteInput{width:100%;height:min(45vh,360px);border:1px solid #cbd5e4;border-radius:9px;padding:12px;resize:vertical;font:13px/1.4 ui-monospace,monospace}
+.modalactions{display:flex;gap:8px;margin-top:12px;justify-content:flex-end}
+.modalactions button{padding:11px 13px;border:0;border-radius:9px;background:#e9eef7;color:#24334b;font-weight:700}
+.modalactions button.primary{background:#486bfa;color:#fff}
+@media(min-width:900px){header{padding:14px 20px}.mainbar,.previewtools,.edittools,.bottom{padding-left:20px;padding-right:20px}.previewarea{padding:22px}.framewrap{max-width:1200px}}
+</style>
+</head>
+<body>
+<div id="app">
+ <header>
+  <div class="heading">
+   <div><div class="sub">Layout Studio / Tools</div><h1>Code Viewer</h1></div>
+   <a class="home" href="./index.html" aria-label="Open Layout Studio">Layout Studio</a>
+  </div>
+  <div class="quick">
+   <button type="button" class="action primary" id="quickPaste">▣ &nbsp; Quick Paste</button>
+   <button type="button" class="action clear" id="quickClear">✕ &nbsp; Quick Delete</button>
+  </div>
+ </header>
+ <div class="mainbar">
+  <div class="switch">
+   <button id="viewPreview" class="active" aria-pressed="true">Preview</button>
+   <button id="viewCode" aria-pressed="false">Code</button>
+  </div>
+  <span id="saveStatus">Ready</span>
+ </div>
+ <main>
+  <section class="panel" id="previewPanel">
+   <div class="previewtools">
+    <label for="previewSize">Width</label>
+    <select id="previewSize" aria-label="Preview width">
+     <option value="fit">Fit screen</option><option value="390">Phone · 390</option><option value="768">Tablet · 768</option><option value="1200">Desktop · 1200</option>
+    </select>
+    <button class="smallbutton push" id="runPreview" title="Reload preview">↻ Run</button>
+    <button class="smallbutton" id="fullPreview" title="Toggle full screen">⛶ Full</button>
+   </div>
+   <div class="previewarea" id="previewArea"><div class="framewrap" id="frameWrap">
+    <iframe id="result" title="Isolated component preview" sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer"></iframe>
+   </div></div>
+   <div id="previewInfo">Paste HTML/CSS to see a live preview.</div>
+  </section>
+  <section class="panel hidden" id="codePanel">
+   <div class="edittools">
+    <div class="codechoices">
+     <button type="button" id="tabHtml" class="active">HTML</button>
+     <button type="button" id="tabCss">CSS</button>
+     <button type="button" id="tabJs">JavaScript</button>
+    </div>
+    <button type="button" class="smallbutton" id="runCode">↻ Run</button>
+   </div>
+   <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" placeholder="Paste HTML here..."></textarea>
+  </section>
+ </main>
+ <div class="bottom">
+  <button type="button" id="copyAll">Copy combined HTML</button>
+  <button type="button" class="export" id="exportHtml">Export .html</button>
+ </div>
+</div>
+<div id="toast" role="status" aria-live="polite"><span id="toastText"></span><button id="undo" type="button" hidden>Undo</button></div>
+<div id="pasteModal" role="dialog" aria-modal="true" aria-labelledby="pasteTitle">
+ <div class="modalcard">
+  <h2 id="pasteTitle">Paste code</h2>
+  <p>Paste your Component Inspector's <strong>Both</strong> output here, or an HTML file. You can also paste HTML, CSS or JavaScript separately.</p>
+  <textarea id="pasteInput" spellcheck="false" autocapitalize="off" placeholder="Touch and hold here, then choose Paste"></textarea>
+  <div class="modalactions">
+   <button id="cancelPaste">Cancel</button><button id="importPaste" class="primary">Paste &amp; Preview</button>
+  </div>
+ </div>
+</div>
+<script>
+(function(){
+ 'use strict';
+ var STORAGE='layout-studio-code-viewer-v1';
+ var keys=['html','css','js'];
+ var data={html:'',css:'',js:''};
+ var active='html',view='preview',saveTimer=null,previewTimer=null,toastTimer=null,previousClear=null,full=false;
+ var el=function(id){return document.getElementById(id);};
+ function status(t){el('saveStatus').textContent=t;}
+ function persist(){
+  try{localStorage.setItem(STORAGE,JSON.stringify(data));status('Saved locally');}
+  catch(e){status('Not saved');}
+ }
+ function schedule(){
+  status('Editing…');
+  clearTimeout(saveTimer);saveTimer=setTimeout(persist,280);
+  clearTimeout(previewTimer);previewTimer=setTimeout(render,380);
+ }
+ function toast(t,undo){
+  clearTimeout(toastTimer);el('toastText').textContent=t;
+  el('undo').hidden=!undo;el('toast').style.display='flex';
+  toastTimer=setTimeout(function(){el('toast').style.display='none';},6000);
+ }
+ function snapshot(){return {html:data.html,css:data.css,js:data.js};}
+ function setData(next){
+  data={html:next.html||'',css:next.css||'',js:next.js||''};
+  el('editor').value=data[active];persist();render();
+ }
+ function codeTab(k){
+  data[active]=el('editor').value;
+  active=k;el('editor').value=data[k];
+  el('tabHtml').classList.toggle('active',k==='html');
+  el('tabCss').classList.toggle('active',k==='css');
+  el('tabJs').classList.toggle('active',k==='js');
+  el('editor').placeholder=k==='html'?'Paste HTML here...':k==='css'?'Paste CSS here...':'Paste JavaScript here...';
+ }
+ function setView(v){
+  view=v;el('previewPanel').classList.toggle('hidden',v!=='preview');
+  el('codePanel').classList.toggle('hidden',v!=='code');
+  el('viewPreview').classList.toggle('active',v==='preview');
+  el('viewCode').classList.toggle('active',v==='code');
+  el('viewPreview').setAttribute('aria-pressed',String(v==='preview'));
+  el('viewCode').setAttribute('aria-pressed',String(v==='code'));
+  if(v==='preview')render();
+ }
+ function strippedFences(t){
+  var s=t.trim();
+  if(s.indexOf('&#96;&#96;&#96;')===0)return s;
+  if(s.slice(0,3)==='\u0060\u0060\u0060'){
+   var a=s.indexOf('\n');if(a>=0)s=s.slice(a+1);
+   s=s.replace(/\n?\u0060\u0060\u0060\s*$/,'');
+  }
+  return s;
+ }
+ function parsePaste(raw){
+  var t=strippedFences(raw);
+  if(!t.trim())return null;
+  var m=t.match(/^HTML\s*\n([\s\S]*?)\n\s*CSS\s*\n([\s\S]*)$/i);
+  if(m)return {html:m[1].trim(),css:m[2].trim(),js:''};
+  if(!/<[a-z!/?][^>]*>/i.test(t)){
+   if(/^\s*(?:@(?:media|supports|keyframes)|\/\*[\s\S]*?\*\/|[.#*:\w-]+\s*[\{,])/.test(t)&&t.indexOf('{')>=0)
+    return {html:'',css:t,js:''};
+   return {html:'',css:'',js:t};
+  }
+  var full=/<!doctype|<html\b|<head\b|<body\b/i.test(t);
+  var doc=full?new DOMParser().parseFromString(t,'text/html'):null;
+  var tmp=document.createElement('template');
+  if(!full)tmp.innerHTML=t;
+  var root=full?doc:tmp.content;
+  var styles=Array.from(root.querySelectorAll('style')).map(function(n){var s=n.textContent;n.remove();return s;});
+  var scripts=Array.from(root.querySelectorAll('script')).map(function(n){var s=n.src?'/* External script not included: '+n.src+' */':n.textContent;n.remove();return s;});
+  root.querySelectorAll('link[rel="stylesheet"]').forEach(function(n){n.remove();});
+  var html=full?doc.body.innerHTML:tmp.innerHTML;
+  return {html:html.trim(),css:styles.join('\n\n').trim(),js:scripts.join('\n\n').trim()};
+ }
+ function previewDocument(){
+  var css=data.css.replace(/<\/style/gi,'<\\/style');
+  var js=data.js.replace(/<\/script/gi,'<\\/script');
+  var monitor="window.addEventListener('error',function(e){try{parent.postMessage({viewerError:String(e.message||'Script error')},'*')}catch(x){}});";
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+   '<style>html,body{min-height:100%;}body{margin:8px;}'+css+'</style></head><body>'+
+   data.html+'<script>'+monitor+'<\/script><script>'+js+'<\/script></body></html>';
+ }
+ function render(){
+  if(view!=='preview'&&!full)return;
+  el('previewInfo').classList.remove('problem');
+  el('previewInfo').textContent=(data.html||data.css||data.js)?'Preview runs in an isolated frame.':'Paste HTML/CSS to see a live preview.';
+  el('result').srcdoc=previewDocument();
+ }
+ function resizePreview(){
+  var width=el('previewSize').value;
+  var wrap=el('frameWrap');
+  wrap.style.width=width==='fit'?'100%':width+'px';
+  wrap.style.flexShrink='0';
+ }
+ function htmlOutput(){
+  var css=data.css.replace(/<\/style/gi,'<\\/style');
+  var js=data.js.replace(/<\/script/gi,'<\\/script');
+  return '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<style>\n'+css+'\n</style>\n</head>\n<body>\n'+data.html+'\n<script>\n'+js+'\n<\/script>\n</body>\n</html>\n';
+ }
+ function fallbackCopy(text){
+  var ta=document.createElement('textarea');ta.value=text;
+  ta.style.cssText='position:fixed;left:0;top:0;width:2px;height:2px;opacity:0';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  var yes=false;try{yes=document.execCommand('copy');}catch(e){}
+  ta.remove();return yes;
+ }
+ async function copyText(text){
+  try{if(!navigator.clipboard||!navigator.clipboard.writeText)throw Error('Clipboard unavailable');
+   await navigator.clipboard.writeText(text);return true;
+  }catch(e){return fallbackCopy(text);}
+ }
+ function showPaste(){
+  el('pasteInput').value='';
+  el('pasteModal').classList.add('open');
+  setTimeout(function(){el('pasteInput').focus();},40);
+ }
+ async function quickPaste(){
+  try{
+   if(!navigator.clipboard||!navigator.clipboard.readText)throw Error('Clipboard permission');
+   var text=await navigator.clipboard.readText();
+   if(!text.trim())throw Error('Clipboard empty');
+   var parts=parsePaste(text);
+   if(!parts)throw Error('Empty code');
+   previousClear=null;setData(parts);setView('preview');toast('Pasted and preview updated',false);
+  }catch(e){showPaste();}
+ }
+ function importManually(){
+  var parts=parsePaste(el('pasteInput').value);
+  if(!parts){toast('Paste some code first',false);return;}
+  previousClear=null;setData(parts);el('pasteModal').classList.remove('open');setView('preview');toast('Pasted and preview updated',false);
+ }
+ function clearAll(){
+  previousClear=snapshot();setData({html:'',css:'',js:''});
+  toast('Code deleted',true);
+ }
+ function undoClear(){if(previousClear){setData(previousClear);previousClear=null;el('toast').style.display='none';}}
+ function exportFile(){
+  var blob=new Blob([htmlOutput()],{type:'text/html;charset=utf-8'});
+  var url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='code-viewer-export.html';a.style.display='none';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},3000);toast('HTML file exported',false);
+ }
+ el('quickPaste').addEventListener('click',quickPaste);
+ el('quickClear').addEventListener('click',clearAll);
+ el('undo').addEventListener('click',undoClear);
+ el('cancelPaste').addEventListener('click',function(){el('pasteModal').classList.remove('open');});
+ el('importPaste').addEventListener('click',importManually);
+ el('pasteModal').addEventListener('click',function(e){if(e.target===el('pasteModal'))el('pasteModal').classList.remove('open');});
+ el('viewPreview').addEventListener('click',function(){setView('preview');});
+ el('viewCode').addEventListener('click',function(){setView('code');});
+ el('tabHtml').addEventListener('click',function(){codeTab('html');});
+ el('tabCss').addEventListener('click',function(){codeTab('css');});
+ el('tabJs').addEventListener('click',function(){codeTab('js');});
+ el('editor').addEventListener('input',function(){data[active]=this.value;schedule();});
+ el('previewSize').addEventListener('change',resizePreview);
+ el('runPreview').addEventListener('click',render);
+ el('runCode').addEventListener('click',function(){setView('preview');});
+ el('fullPreview').addEventListener('click',function(){
+  full=!full;el('previewPanel').classList.toggle('fullscreen',full);
+  if(full)setView('preview');
+  el('fullPreview').textContent=full?'✕ Close':'⛶ Full';
+  resizePreview();
+ });
+ el('copyAll').addEventListener('click',async function(){var ok=await copyText(htmlOutput());toast(ok?'Combined HTML copied':'Copy blocked — use Export instead',false);});
+ el('exportHtml').addEventListener('click',exportFile);
+ window.addEventListener('message',function(e){
+  if(e.source!==el('result').contentWindow||!e.data||!e.data.viewerError)return;
+  el('previewInfo').classList.add('problem');
+  el('previewInfo').textContent='JavaScript error: '+e.data.viewerError;
+ });
+ try{var saved=JSON.parse(localStorage.getItem(STORAGE)||'null');
+  if(saved&&typeof saved==='object'){keys.forEach(function(k){if(typeof saved[k]==='string')data[k]=saved[k];});status('Restored');}
+ }catch(e){status('Ready');}
+ el('editor').value=data.html;resizePreview();render();
+})();
+</script>
+</body>
+</html>
