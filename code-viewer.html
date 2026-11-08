@@ -11,7 +11,7 @@
 :root{color-scheme:light;--ink:#182438;--muted:#708096;--blue:#486bfa;--line:#dfe5ef;--bg:#eef2f8}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
-button,textarea,select{font:inherit}button{cursor:pointer;touch-action:manipulation}
+button,textarea,select{font:inherit}textarea,select,input{font-size:16px}button{cursor:pointer;touch-action:manipulation}
 button:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid #6685ff;outline-offset:2px}
 #app{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 header{padding:calc(env(safe-area-inset-top,0px) + 9px) 13px 12px;background:#172235;color:white;flex:none}
@@ -50,7 +50,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
 .codechoices{display:flex;gap:5px}
 .codechoices button{background:#eef2f8;border:0;border-radius:8px;color:#50647e;font-weight:700;padding:9px 13px}
 .codechoices button.active{background:#dce5ff;color:#3152c6}
-#editor{flex:1;width:100%;min-height:0;resize:none;border:0;outline:none;padding:15px 14px 30px;background:#111927;color:#edf3ff;line-height:1.53;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2;white-space:pre;overflow:auto;overflow-wrap:normal}
+#editor{flex:1;width:100%;min-height:0;resize:none;border:0;outline:none;padding:15px 14px 30px;background:#111927;color:#edf3ff;line-height:1.53;font-size:16px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;tab-size:2;white-space:pre;overflow:auto;overflow-wrap:normal}
 #editor::placeholder{color:#98a5b8}
 .bottom{background:#fff;border-top:1px solid var(--line);padding:9px 12px calc(env(safe-area-inset-bottom,0px) + 9px);display:flex;gap:9px;align-items:center;justify-content:space-between;flex:none}
 .bottom button{border-radius:9px;border:1px solid #d9e1ed;background:#fff;padding:10px 12px;font-weight:650;color:#26384f}
@@ -62,7 +62,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
 .modalcard{width:100%;max-width:620px;background:#fff;border-radius:16px;padding:17px;box-shadow:0 24px 65px #0005}
 .modalcard h2{font-size:19px;margin:0 0 5px}
 .modalcard p{font-size:13px;color:#65748a;line-height:1.5;margin:0 0 12px}
-#pasteInput{width:100%;height:min(45vh,360px);border:1px solid #cbd5e4;border-radius:9px;padding:12px;resize:vertical;font:13px/1.4 ui-monospace,monospace}
+#pasteInput{width:100%;height:min(45vh,360px);border:1px solid #cbd5e4;border-radius:9px;padding:12px;resize:vertical;font:16px/1.45 ui-monospace,monospace}
 .modalactions{display:flex;gap:8px;margin-top:12px;justify-content:flex-end}
 .modalactions button{padding:11px 13px;border:0;border-radius:9px;background:#e9eef7;color:#24334b;font-weight:700}
 .modalactions button.primary{background:#486bfa;color:#fff}
@@ -124,10 +124,10 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
 <div id="pasteModal" role="dialog" aria-modal="true" aria-labelledby="pasteTitle">
  <div class="modalcard">
   <h2 id="pasteTitle">Paste code</h2>
-  <p>Paste your Component Inspector's <strong>Both</strong> output here, or an HTML file. You can also paste HTML, CSS or JavaScript separately.</p>
+  <p id="pasteHint">Safari couldn't read the clipboard on the first attempt. Tap <strong>Try clipboard again</strong> or paste into the field below. A manual paste imports automatically.</p>
   <textarea id="pasteInput" spellcheck="false" autocapitalize="off" placeholder="Touch and hold here, then choose Paste"></textarea>
   <div class="modalactions">
-   <button id="cancelPaste">Cancel</button><button id="importPaste" class="primary">Paste &amp; Preview</button>
+   <button id="cancelPaste">Cancel</button><button id="retryClipboard">Try clipboard again</button><button id="importPaste" class="primary">Preview</button>
   </div>
  </div>
 </div>
@@ -243,25 +243,37 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
    await navigator.clipboard.writeText(text);return true;
   }catch(e){return fallbackCopy(text);}
  }
+ function importText(text){
+  var parts=parsePaste(text);
+  if(!parts)return false;
+  previousClear=null;setData(parts);
+  el('pasteModal').classList.remove('open');
+  setView('preview');toast('Pasted and preview updated',false);
+  return true;
+ }
  function showPaste(){
   el('pasteInput').value='';
+  el('pasteHint').textContent='Safari could not read the clipboard automatically. Tap Try clipboard again, or paste into the field below. Manual paste previews automatically.';
   el('pasteModal').classList.add('open');
-  setTimeout(function(){el('pasteInput').focus();},40);
+ }
+ async function readClipboard(){
+  if(!navigator.clipboard||!navigator.clipboard.readText)return false;
+  try{
+   var content=await navigator.clipboard.readText();
+   return !!(content&&content.trim()&&importText(content));
+  }catch(e){return false;}
  }
  async function quickPaste(){
-  try{
-   if(!navigator.clipboard||!navigator.clipboard.readText)throw Error('Clipboard permission');
-   var text=await navigator.clipboard.readText();
-   if(!text.trim())throw Error('Clipboard empty');
-   var parts=parsePaste(text);
-   if(!parts)throw Error('Empty code');
-   previousClear=null;setData(parts);setView('preview');toast('Pasted and preview updated',false);
-  }catch(e){showPaste();}
+  if(!(await readClipboard()))showPaste();
+ }
+ async function retryClipboard(){
+  if(!(await readClipboard())){
+   el('pasteHint').textContent='Clipboard access is still blocked. Touch and hold in the field, choose Paste, and the preview will open automatically.';
+   el('pasteInput').focus();
+  }
  }
  function importManually(){
-  var parts=parsePaste(el('pasteInput').value);
-  if(!parts){toast('Paste some code first',false);return;}
-  previousClear=null;setData(parts);el('pasteModal').classList.remove('open');setView('preview');toast('Pasted and preview updated',false);
+  if(!importText(el('pasteInput').value))toast('Paste some code first',false);
  }
  function clearAll(){
   previousClear=snapshot();setData({html:'',css:'',js:''});
@@ -279,6 +291,16 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
  el('undo').addEventListener('click',undoClear);
  el('cancelPaste').addEventListener('click',function(){el('pasteModal').classList.remove('open');});
  el('importPaste').addEventListener('click',importManually);
+ el('retryClipboard').addEventListener('click',retryClipboard);
+ el('pasteInput').addEventListener('paste',function(e){
+  var text=e.clipboardData&&e.clipboardData.getData('text/plain');
+  if(text&&text.trim()){
+   e.preventDefault();
+   importText(text);
+  }else{
+   setTimeout(function(){if(el('pasteModal').classList.contains('open')&&el('pasteInput').value.trim())importManually();},100);
+  }
+ });
  el('pasteModal').addEventListener('click',function(e){if(e.target===el('pasteModal'))el('pasteModal').classList.remove('open');});
  el('viewPreview').addEventListener('click',function(){setView('preview');});
  el('viewCode').addEventListener('click',function(){setView('code');});
