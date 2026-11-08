@@ -62,7 +62,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
 .modalcard{width:100%;max-width:620px;background:#fff;border-radius:16px;padding:17px;box-shadow:0 24px 65px #0005}
 .modalcard h2{font-size:19px;margin:0 0 5px}
 .modalcard p{font-size:13px;color:#65748a;line-height:1.5;margin:0 0 12px}
-#pasteInput{width:100%;height:min(45vh,360px);border:1px solid #cbd5e4;border-radius:9px;padding:12px;resize:vertical;font:16px/1.45 ui-monospace,monospace}
+#pasteInput{width:100%;height:min(25vh,180px);border:1px solid #cbd5e4;border-radius:9px;padding:12px;resize:vertical;font:16px/1.45 ui-monospace,monospace}
 .modalactions{display:flex;gap:8px;margin-top:12px;justify-content:flex-end}
 .modalactions button{padding:11px 13px;border:0;border-radius:9px;background:#e9eef7;color:#24334b;font-weight:700}
 .modalactions button.primary{background:#486bfa;color:#fff}
@@ -124,10 +124,10 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
 <div id="pasteModal" role="dialog" aria-modal="true" aria-labelledby="pasteTitle">
  <div class="modalcard">
   <h2 id="pasteTitle">Paste code</h2>
-  <p id="pasteHint">Safari couldn't read the clipboard on the first attempt. Tap <strong>Try clipboard again</strong> or paste into the field below. A manual paste imports automatically.</p>
-  <textarea id="pasteInput" spellcheck="false" autocapitalize="off" placeholder="Touch and hold here, then choose Paste"></textarea>
+  <p id="pasteHint">Use the iPhone's normal <strong>Paste</strong> option in the selected field below. If the menu doesn't appear, touch and hold the field. The preview opens automatically.</p>
+  <textarea id="pasteInput" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Paste code here"></textarea>
   <div class="modalactions">
-   <button id="cancelPaste">Cancel</button><button id="retryClipboard">Try clipboard again</button><button id="importPaste" class="primary">Preview</button>
+   <button id="cancelPaste">Cancel</button><button id="importPaste" class="primary">Preview</button>
   </div>
  </div>
 </div>
@@ -251,29 +251,16 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
   setView('preview');toast('Pasted and preview updated',false);
   return true;
  }
- function showPaste(){
-  el('pasteInput').value='';
-  el('pasteHint').textContent='Safari could not read the clipboard automatically. Tap Try clipboard again, or paste into the field below. Manual paste previews automatically.';
+ function quickPaste(){
+  var field=el('pasteInput');
+  field.value='Paste here';
   el('pasteModal').classList.add('open');
- }
- async function readClipboard(){
-  if(!navigator.clipboard||!navigator.clipboard.readText)return false;
-  try{
-   var content=await navigator.clipboard.readText();
-   return !!(content&&content.trim()&&importText(content));
-  }catch(e){return false;}
- }
- async function quickPaste(){
-  if(!(await readClipboard()))showPaste();
- }
- async function retryClipboard(){
-  if(!(await readClipboard())){
-   el('pasteHint').textContent='Clipboard access is still blocked. Touch and hold in the field, choose Paste, and the preview will open automatically.';
-   el('pasteInput').focus();
-  }
+  field.focus({preventScroll:true});
+  field.setSelectionRange(0,field.value.length);
  }
  function importManually(){
-  if(!importText(el('pasteInput').value))toast('Paste some code first',false);
+  var value=el('pasteInput').value;
+  if(value==='Paste here'||!importText(value))toast('Paste some code first',false);
  }
  function clearAll(){
   previousClear=snapshot();setData({html:'',css:'',js:''});
@@ -291,14 +278,24 @@ iframe{display:block;width:100%;height:100%;border:0;background:#fff}
  el('undo').addEventListener('click',undoClear);
  el('cancelPaste').addEventListener('click',function(){el('pasteModal').classList.remove('open');});
  el('importPaste').addEventListener('click',importManually);
- el('retryClipboard').addEventListener('click',retryClipboard);
  el('pasteInput').addEventListener('paste',function(e){
   var text=e.clipboardData&&e.clipboardData.getData('text/plain');
   if(text&&text.trim()){
    e.preventDefault();
    importText(text);
   }else{
-   setTimeout(function(){if(el('pasteModal').classList.contains('open')&&el('pasteInput').value.trim())importManually();},100);
+   setTimeout(function(){
+    var input=el('pasteInput').value;
+    if(el('pasteModal').classList.contains('open')&&input.trim()&&input!=='Paste here')importManually();
+   },120);
+  }
+ });
+ el('pasteInput').addEventListener('input',function(e){
+  if(e.inputType==='insertFromPaste'){
+   setTimeout(function(){
+    var input=el('pasteInput').value;
+    if(el('pasteModal').classList.contains('open')&&input.trim()&&input!=='Paste here')importManually();
+   },0);
   }
  });
  el('pasteModal').addEventListener('click',function(e){if(e.target===el('pasteModal'))el('pasteModal').classList.remove('open');});
