@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#e9ecf0">
 <title>Layout Studio — Original Transparent Device Mockups</title>
 <style>
 :root{color-scheme:light;--grey:#e9ecf0;--accent:#4669f5}
 *,*::before,*::after{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;touch-action:pan-x pan-y;overscroll-behavior:none}
 body{background:var(--grey);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}
 .app{position:relative;width:100%;height:100vh;height:100dvh;overflow:hidden}
 .device-switch{position:absolute;z-index:10;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%);display:flex;gap:4px;padding:5px;background:white;border:1px solid #d9dee7;border-radius:15px;box-shadow:0 5px 18px #18213617}
@@ -16,9 +16,9 @@ body{background:var(--grey);font-family:system-ui,-apple-system,BlinkMacSystemFo
 .device-switch button[aria-pressed="true"]{color:white;background:var(--accent)}
 .device-switch button:focus-visible{outline:3px solid #263d9d;outline-offset:2px}
 .device-switch button svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.stage{position:absolute;top:calc(env(safe-area-inset-top,0px) + 81px);left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.stage{position:absolute;top:calc(env(safe-area-inset-top,0px) + 81px);left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none}
 .slot{position:relative;flex:none}
-.device{position:absolute;left:0;top:0;transform-origin:top left;will-change:transform}
+.device{position:absolute;left:0;top:0;transform-origin:top left}
 .screen{position:absolute;background:#fff;overflow:hidden;isolation:isolate;contain:layout paint;transform:translateZ(0)}
 .screen iframe{display:block;position:absolute;inset:0;border:0;background:white;width:100%;height:100%;overflow:auto;-webkit-overflow-scrolling:touch}
 .frame-image{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;user-select:none;-webkit-user-drag:none}
@@ -61,25 +61,111 @@ try{
  const saved=sessionStorage.getItem(selectedDeviceKey);
  if(saved&&Object.prototype.hasOwnProperty.call(presets,saved))active=saved;
 }catch(_){}
+// Zoom the mockup itself, never Safari's page viewport or iframe CSS viewport.
 let lastPinchAt=0;
-const markPinch=e=>{
- if((e.touches&&e.touches.length>1)||e.type==='gesturestart'||e.type==='gesturechange')lastPinchAt=Date.now();
-};
-window.addEventListener('touchstart',markPinch,{capture:true,passive:true});
-window.addEventListener('touchmove',markPinch,{capture:true,passive:true});
-window.addEventListener('gesturestart',markPinch,{capture:true,passive:true});
-window.addEventListener('gesturechange',markPinch,{capture:true,passive:true});
-// On iOS a pinch may start within the preview iframe, outside parent touch events.
+let zoom=1, panX=0, panY=0, baseScale=1, baseWidth=0, baseHeight=0;
+let pinch=null, drag=null, fallbackGesture=null;
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+const maxZoom=()=>Math.max(1,Math.min(5,1.25/Math.max(baseScale,.01)));
+
+function paintZoom(){
+ if(!baseWidth||!baseHeight)return;
+ zoom=clamp(zoom,1,maxZoom());
+ const w=baseWidth*zoom,h=baseHeight*zoom;
+ panX=clamp(panX,-Math.max(0,(w-stage.clientWidth)/2),Math.max(0,(w-stage.clientWidth)/2));
+ panY=clamp(panY,-Math.max(0,(h-stage.clientHeight)/2),Math.max(0,(h-stage.clientHeight)/2));
+ // Fixed-size slot centres the zoomed device. The live iframe keeps its real CSS dimensions.
+ device.style.left=((baseWidth-w)/2)+'px';
+ device.style.top=((baseHeight-h)/2)+'px';
+ device.style.transform='scale('+(baseScale*zoom)+')';
+ slot.style.transform='translate3d('+panX+'px,'+panY+'px,0)';
+}
+function applyZoom(next,clientX,clientY,startZoom=zoom,startX=panX,startY=panY){
+ const rect=stage.getBoundingClientRect();
+ const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+ const z=clamp(next,1,maxZoom()), ratio=z/startZoom;
+ // Keep the point between the fingers as stationary as possible while zooming.
+ zoom=z;
+ panX=(clientX-cx)-(clientX-cx-startX)*ratio;
+ panY=(clientY-cy)-(clientY-cy-startY)*ratio;
+ paintZoom();
+}
+function touchPagePoint(t,inFrame){
+ if(!inFrame)return {x:t.clientX,y:t.clientY};
+ const r=canvas.getBoundingClientRect();
+ // Touch coordinates inside an iframe are local, not top-window CSS pixels.
+ return {x:r.left+t.clientX*r.width/canvas.clientWidth,y:r.top+t.clientY*r.height/canvas.clientHeight};
+}
+function touchPair(e,inFrame){
+ const a=touchPagePoint(e.touches[0],inFrame),b=touchPagePoint(e.touches[1],inFrame);
+ return {x:(a.x+b.x)/2,y:(a.y+b.y)/2,d:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y))};
+}
+function cancel(e){if(e.cancelable)e.preventDefault();}
+function touchStart(e,inFrame){
+ if(e.touches.length>=2){
+  cancel(e);lastPinchAt=Date.now();drag=null;
+  const a=touchPair(e,inFrame);
+  pinch={d:a.d,zoom,panX,panY,x:a.x,y:a.y};
+ }else if(!inFrame&&e.touches.length===1&&zoom>1){
+  const p=touchPagePoint(e.touches[0],false);
+  drag={x:p.x,y:p.y,panX,panY};
+ }
+}
+function touchMove(e,inFrame){
+ if(e.touches.length>=2){
+  cancel(e);lastPinchAt=Date.now();
+  const p=touchPair(e,inFrame);
+  if(!pinch){pinch={d:p.d,zoom,panX,panY,x:p.x,y:p.y};return;}
+  // Finger translation pans; separation magnifies. Neither action changes media queries.
+  const z=clamp(pinch.zoom*p.d/pinch.d,1,maxZoom());
+  applyZoom(z,p.x,p.y,pinch.zoom,pinch.panX+p.x-pinch.x,pinch.panY+p.y-pinch.y);
+ }else if(!inFrame&&drag&&e.touches.length===1){
+  cancel(e);
+  const p=touchPagePoint(e.touches[0],false);
+  panX=drag.panX+p.x-drag.x;panY=drag.panY+p.y-drag.y;
+  paintZoom();
+ }
+}
+function touchEnd(e){
+ if(e.touches.length<2)pinch=null;
+ if(e.touches.length===0)drag=null;
+}
+function gestureHandler(e,inFrame){
+ cancel(e);lastPinchAt=Date.now();
+ if(e.type==='gesturestart'){
+  fallbackGesture={zoom,panX,panY};return;
+ }
+ if(e.type==='gesturechange'&&fallbackGesture&&!pinch&&Number.isFinite(e.scale)){
+  const p=inFrame?touchPagePoint({clientX:e.clientX||canvas.clientWidth/2,clientY:e.clientY||canvas.clientHeight/2},true):
+   {x:e.clientX||window.innerWidth/2,y:e.clientY||window.innerHeight/2};
+  applyZoom(fallbackGesture.zoom*e.scale,p.x,p.y,fallbackGesture.zoom,fallbackGesture.panX,fallbackGesture.panY);
+ }
+ if(e.type==='gestureend')fallbackGesture=null;
+}
+function attachTouches(doc,inFrame){
+ doc.addEventListener('touchstart',e=>touchStart(e,inFrame),{capture:true,passive:false});
+ doc.addEventListener('touchmove',e=>touchMove(e,inFrame),{capture:true,passive:false});
+ doc.addEventListener('touchend',touchEnd,{capture:true,passive:true});
+ doc.addEventListener('touchcancel',touchEnd,{capture:true,passive:true});
+ for(const type of ['gesturestart','gesturechange','gestureend'])
+  doc.addEventListener(type,e=>gestureHandler(e,inFrame),{capture:true,passive:false});
+}
+attachTouches(stage,false);
 canvas.addEventListener('load',()=>{
  try{
   const doc=canvas.contentDocument;
-  if(!doc)return;
-  doc.addEventListener('touchstart',markPinch,{capture:true,passive:true});
-  doc.addEventListener('touchmove',markPinch,{capture:true,passive:true});
-  doc.addEventListener('gesturestart',markPinch,{capture:true,passive:true});
-  doc.addEventListener('gesturechange',markPinch,{capture:true,passive:true});
+  if(!doc)return; // A cross-origin URL cannot be instrumented by the parent.
+  attachTouches(doc,true);
+  // Native pinch is disabled, but ordinary one-finger page scrolling stays enabled.
+  doc.documentElement.style.setProperty('touch-action','pan-x pan-y','important');
  }catch(_){}
 });
+// Stop browser-level pinch on the background, including iOS Safari gesture events.
+for(const type of ['gesturestart','gesturechange','gestureend']){
+ document.addEventListener(type,e=>{
+  if(!stage.contains(e.target))cancel(e);
+ },{capture:true,passive:false});
+}
 let dragDepth=0;
 const hasDemo=new URLSearchParams(location.search).get('demo')==='1';
 canvas.srcdoc=hasDemo?samplePage:defaultPage;
@@ -92,12 +178,12 @@ function fit(){
  const aw=stage.clientWidth,ah=stage.clientHeight;
  if(!aw||!ah)return;
  // Scale the entire visual mockup, never the iframe's actual layout dimensions.
- const scale=Math.min(1,aw/outerWidth,ah/outerHeight);
- slot.style.width=(outerWidth*scale)+'px';
- slot.style.height=(outerHeight*scale)+'px';
+ baseScale=Math.min(1,aw/outerWidth,ah/outerHeight);
+ baseWidth=outerWidth*baseScale;baseHeight=outerHeight*baseScale;
+ slot.style.width=baseWidth+'px';
+ slot.style.height=baseHeight+'px';
  device.style.width=outerWidth+'px';
  device.style.height=outerHeight+'px';
- device.style.transform='scale('+scale+')';
  screen.style.left=(p.holeX*xScale)+'px';
  screen.style.top=(p.holeY*yScale)+'px';
  screen.style.width=p.width+'px';
@@ -106,9 +192,11 @@ function fit(){
  // Explicit iframe dimensions: CSS media queries/sticky/fixed positions use these.
  canvas.style.width=p.width+'px';
  canvas.style.height=p.height+'px';
+ paintZoom();
 }
 function setDevice(name){
  if(!Object.prototype.hasOwnProperty.call(presets,name))return;
+ if(active!==name){zoom=1;panX=0;panY=0;pinch=null;drag=null;}
  active=name;
  try{sessionStorage.setItem(selectedDeviceKey,name)}catch(_){}
  buttons.forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.device===name)));
@@ -135,7 +223,7 @@ window.addEventListener('drop',async e=>{
  if(f)canvas.srcdoc=await f.text();
 });
 window.LayoutStudioMockup=Object.freeze({
- setDevice, setHtml(html){canvas.removeAttribute('src');canvas.srcdoc=String(html)},
+ setDevice, resetZoom(){zoom=1;panX=0;panY=0;paintZoom()}, getZoom(){return zoom}, setHtml(html){canvas.removeAttribute('src');canvas.srcdoc=String(html)},
  setUrl(url){canvas.removeAttribute('srcdoc');canvas.src=String(url)},
  reset(){canvas.removeAttribute('src');canvas.srcdoc=defaultPage},
  demo(){canvas.removeAttribute('src');canvas.srcdoc=samplePage},
